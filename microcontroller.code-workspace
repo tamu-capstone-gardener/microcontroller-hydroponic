@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "../microcontroller"
+		},
+		{
+			"name": "planthub-microcontroller",
+			"path": "."
+		}
+	],
+	"settings": {}
+}

@@ -145,9 +145,9 @@
 #include <SPI.h>
 #include <DHT.h>
 // Sensor Pins
-#define LIGHT_ANALOG_PIN 13  // Analog pin
+#define LIGHT_ANALOG_PIN 14  // Analog pin means GIOP14
 #define LIGHT_DIGITAL_PIN 12 // Digital pin
-#define DHTPIN 5
+#define DHTPIN 26 // THIS MEANS GIOP26 aka pin 10
 #define DHTTYPE DHT22
 
 float temperature;
@@ -172,6 +172,7 @@ void loop() {
 
   // Read from Temperature Sensor
   temperature = dht.readTemperature();
+  delay(200);
   humidity = dht.readHumidity();
   Serial.print("Analog Light: ");
   Serial.print(analogValue);

@@ -4,39 +4,67 @@
 #include <Wire.h>
 #include <SPI.h>
 #include <DHT.h>
+#include <time.h>
 
-
-// Sensor Pins
-#define LIGHT_ANALOG_PIN 14  // Analog pin means GIOP14
-#define LIGHT_DIGITAL_PIN 12 // Digital pin
+#define LIGHT_ANALOG_PIN 36  // Analog pin means GIO36
+#define LIGHT_DIGITAL_PIN 39 // Digital pin
 #define DHTPIN 26 // THIS MEANS GIOP26 aka pin 10
 #define DHTTYPE DHT22
-#define MOISTURE_SENSOR_PIN 2
+#define MOISTURE_SENSOR_PIN 34
 
 float temperature, humidity;
 
 DHT dht(DHTPIN, DHT22);
 
-// Replace these with your WiFi network credentials
 const char* ssid = "placeholder";
 const char* password = "placeholder";
 
-// MQTT Broker details for HiveMQ Public Broker
-const char* mqtt_server = "broker.hivemq.com";  // Free Public MQTT Broker by HiveMQ
-const int mqtt_port = 1883;                     // TCP Port: 1883 (unencrypted) */
+const char* mqtt_server = "test.mosquitto.org";
+const int mqtt_port = 1883;
+
+char timeStamp[25] = "0000-00-00T00:00:00Z";
+
+const char* ntpServer = "pool.ntp.org";
+const long  gmtOffset_sec = 0;
+const int   daylightOffset_sec = 3600;
 
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-// Callback function to handle incoming MQTT messages
+void printSensorData(float lightAnalogValue, float lightDigitalValue, float moistureAnalogValue, float temperature, float humidity) {
+  Serial.print("Analog Light: ");
+  Serial.print(lightAnalogValue);
+  Serial.print(" | Digital Light: ");
+  Serial.print(lightDigitalValue);
+  Serial.print(" | Moisture Value: ");
+  Serial.print(moistureAnalogValue);
+  Serial.print(" | Temperature: ");
+  Serial.print(temperature);
+  Serial.print(" °C | Humidity: ");
+  Serial.print(humidity);
+  Serial.println(" %");
+}
+
+int publishToMqttServer(PubSubClient& client, const char* sensor_id, int value, const char* timeStamp) {
+  String topic = "planthub/";
+  topic += sensor_id;
+  topic += "/sensor_data";
+
+  String payload = "{\"value\": " + String(value) + ", \"timestamp\": \"" + timeStamp + "\"}";
+
+  bool published = client.publish(topic.c_str(), payload.c_str());
+  return published ? 1 : 0;
+}
+
+
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived on topic: ");
   Serial.println(topic);
-    Serial.print("Message: ");
-    for (unsigned int i = 0; i < length; i++) {
-      Serial.print((char)payload[i]);
-    }
-    Serial.println();
+  Serial.print("Message: ");
+  for (unsigned int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
 } 
 
 // Connect to WiFi
@@ -46,7 +74,7 @@ void setup_wifi() {
   Serial.print("Connecting to WiFi network: ");
   Serial.println(ssid);
   
-WiFi.begin(ssid, password);
+  WiFi.begin(ssid, password);
   
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -67,7 +95,7 @@ void reconnect() {
     clientId += String(random(0xffff), HEX);
     if (client.connect(clientId.c_str())) {
       Serial.println("connected");
-      client.subscribe("esp32/command");
+      client.subscribe("planthub/+/water");
     } else {
       Serial.print("failed, rc=");
       Serial.print(client.state());
@@ -79,7 +107,7 @@ void reconnect() {
 
 // Setup function
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
   pinMode(LIGHT_DIGITAL_PIN, INPUT);
   pinMode(LED_BUILTIN, OUTPUT);
@@ -91,6 +119,8 @@ void setup() {
   
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
+
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 }
 
 void loop() {
@@ -112,30 +142,28 @@ void loop() {
   temperature = dht.readTemperature();
   delay(200);
   humidity = dht.readHumidity();
-  Serial.print("Analog Light: ");
-  Serial.print(lightAnalogValue);
-  Serial.print(" | Digital Light: ");
-  Serial.print(lightDigitalValue);
-  Serial.print(" | Moisture Value: ");
-  Serial.print(moistureAnalogValue);
-  Serial.print(" | Temperature: ");
-  Serial.print(temperature);
-  Serial.print(" °C | Humidity: ");
-  Serial.print(humidity);
-  Serial.println(" %");
+
+  printSensorData(lightAnalogValue, lightDigitalValue, moistureAnalogValue, temperature, humidity);
 
   // Publish sensor values every 5 seconds
   static unsigned long lastMsg = 0;
   unsigned long now = millis();
   if (now - lastMsg > 5000) {
     lastMsg = now;
-    
-    String analogMsg = "Analog: " + String(lightAnalogValue);
-    String digitalMsg = "Digital: " + String(lightDigitalValue);
-
     Serial.println("Publishing sensor data...");
-    client.publish("esp32/light/analog", analogMsg.c_str());
-    client.publish("esp32/light/digital", digitalMsg.c_str());
+    struct tm timeinfo;
+
+    if (getLocalTime(&timeinfo)) {
+      strftime(timeStamp, sizeof(timeStamp), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+    }
+
+    int status = publishToMqttServer(client, "7b2295a0-c5c7-49a1-989c-00612cf22882", lightAnalogValue, timeStamp);
+
+    if (status) {
+      Serial.println("Publish successful");
+    } else {
+      Serial.println("Publish failed");
+    }
   }
 
   digitalWrite(LED_BUILTIN, HIGH);
@@ -144,4 +172,3 @@ void loop() {
 
   delay(2500); // Delay to not overheat the sensor
 }
-

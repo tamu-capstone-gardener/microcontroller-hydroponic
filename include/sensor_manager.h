@@ -8,5 +8,6 @@ int readLightAnalog();
 int readLightDigital();
 float readTemperature();
 float readHumidity();
+void printSensorReadings(int moisture, float temperature, float humidity, int lightAnalog);
 
 #endif

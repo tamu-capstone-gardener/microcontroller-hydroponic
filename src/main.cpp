@@ -21,6 +21,18 @@ bool manualOverride = false;
 unsigned long autoModePauseUntil = 0;
 float temperature, humidity;
 
+const int READ_INTERVAL_MS = 12000;  // 12 seconds between reads (or 5 readings per minute)
+const int NUM_SAMPLES = 5;
+
+unsigned long lastReadTime = 0;
+int readCount = 0;
+
+// Accumulators so that we can average values over a minute for more accurate readings
+int totalMoisture = 0;
+float totalTemperature = 0;
+float totalHumidity = 0;
+int totalLight = 0;
+
 
 // Need to work on this part or get scheduling working
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
@@ -48,25 +60,65 @@ void loop() {
   if (!mqttClient.connected()) reconnectMQTT();
   mqttClient.loop();
 
-  struct tm timeinfo;
-  if (getLocalTime(&timeinfo)) {
-    strftime(timeStamp, sizeof(timeStamp), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+  unsigned long now = millis();
+
+  // Every 12 seconds, take a reading
+  if (now - lastReadTime >= READ_INTERVAL_MS) {
+    lastReadTime = now;
+
+    int moisture = readMoisture();
+    float temp = readTemperature();
+    float hum = readHumidity();
+    int light = readLightAnalog();
+
+    // Uncomment below line for sensor readings printed to serial once every 12 seconds
+    // printSensorReadings(moisture, temp, hum, light);
+
+    totalMoisture += moisture;
+    totalTemperature += temp;
+    totalHumidity += hum;
+    totalLight += light;
+    readCount++;
+
+    Serial.print("Collected reading ");
+    Serial.println(readCount);
   }
 
-  int moisture = readMoisture();
-  temperature = readTemperature();
-  humidity = readHumidity();
-  int lightAnalog = readLightAnalog();
+  // After 5 readings, average and publish
+  if (readCount >= NUM_SAMPLES) {
+    int avgMoisture = totalMoisture / NUM_SAMPLES;
+    float avgTemp = totalTemperature / NUM_SAMPLES;
+    float avgHum = totalHumidity / NUM_SAMPLES;
+    int avgLight = totalLight / NUM_SAMPLES;
 
-  publishSensorData(MOISTURE_SENSOR_ID, moisture, timeStamp);
-  publishSensorData(TEMPERATURE_SENSOR_ID, temperature, timeStamp);
-  publishSensorData(HUMIDITY_SENSOR_ID, humidity, timeStamp);
-  publishSensorData(LIGHT_SENSOR_ID, lightAnalog, timeStamp);
+    // Get time
+    struct tm timeinfo;
+    if (getLocalTime(&timeinfo)) {
+      strftime(timeStamp, sizeof(timeStamp), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
+    }
 
-  if (!manualOverride && millis() > autoModePauseUntil) {
-    if (moisture > 2000) turnPumpRelayOn();
-    else turnPumpRelayOff();
+    // Print and publish once every minute 
+    printSensorReadings(avgMoisture, avgTemp, avgHum, avgLight);
+    publishSensorData(MOISTURE_SENSOR_ID, avgMoisture, timeStamp);
+    publishSensorData(TEMPERATURE_SENSOR_ID, avgTemp, timeStamp);
+    publishSensorData(HUMIDITY_SENSOR_ID, avgHum, timeStamp);
+    publishSensorData(LIGHT_SENSOR_ID, avgLight, timeStamp);
+
+    // Handle auto watering
+    if (!manualOverride && millis() > autoModePauseUntil) {
+      if (avgMoisture > 2000) turnPumpRelayOn();
+      else turnPumpRelayOff();
+    }
+
+    // Reset for next minute
+    readCount = 0;
+    totalMoisture = 0;
+    totalTemperature = 0;
+    totalHumidity = 0;
+    totalLight = 0;
   }
 
-  delay(2000);
+  // MQTT loop
+  mqttClient.loop();
 }
+

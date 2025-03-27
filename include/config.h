@@ -15,6 +15,9 @@
 
 4. Once you have selected pins, test them using the serial monitor 
 
+5. In our configuration we are only taking advantage of the analog light value, 
+but feel free to modify the code to use the digital light instead!
+
 */
 
 // WiFi Configuration

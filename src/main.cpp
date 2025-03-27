@@ -21,6 +21,8 @@ bool manualOverride = false;
 unsigned long autoModePauseUntil = 0;
 float temperature, humidity;
 
+
+// Need to work on this part or get scheduling working
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   String expected = String("planthub/") + PLANT_MODULE_ID + "/water";
   if (String(topic) == expected) {

@@ -25,5 +25,14 @@ void reconnectMQTT() {
 int publishSensorData(const char* sensor_id, int value, const char* timestamp) {
   String topic = "planthub/" + String(sensor_id) + "/sensor_data";
   String payload = "{\"value\": " + String(value) + ", \"timestamp\": \"" + timestamp + "\"}";
+  
+  // Serial logging
+  Serial.print("Publishing: ");
+  Serial.print(value);
+  Serial.print(" at ");
+  Serial.print(timestamp);
+  Serial.print(" for sensor: ");
+  Serial.println(sensor_id);
+  
   return mqttClient.publish(topic.c_str(), payload.c_str());
 }

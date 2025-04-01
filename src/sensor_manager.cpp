@@ -6,20 +6,15 @@ DHT dht(DHTPIN, DHTTYPE);
 
 void initSensors() {
   dht.begin();
-  pinMode(MOISTURE_SENSOR_PIN, INPUT);
-  pinMode(LIGHT_DIGITAL_PIN, INPUT);
+  pinMode(MOISTURE_PIN, INPUT);
 }
 
 int readMoisture() {
-  return analogRead(MOISTURE_SENSOR_PIN);
+  return analogRead(MOISTURE_PIN);
 }
 
 int readLightAnalog() {
   return analogRead(LIGHT_ANALOG_PIN);
-}
-
-int readLightDigital() {
-  return digitalRead(LIGHT_DIGITAL_PIN);
 }
 
 float readTemperature() {

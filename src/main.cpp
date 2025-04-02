@@ -62,7 +62,7 @@ std::vector<Control> controlsList;
 // Populate the list of controls.
 void setupControlsList() {
   controlsList.push_back({
-    "water",
+    "pump",
     []() { 
       Serial.println("Turning pump ON"); 
       turnPumpRelayOn(); 

@@ -5,6 +5,7 @@
 
 // WiFi Configuration
 #define WIFI_SSID     "placeholder"
+#define WIFI_USERNAME "placeholder"
 #define WIFI_PASSWORD "placeholder"
 
 // MQTT Configuration

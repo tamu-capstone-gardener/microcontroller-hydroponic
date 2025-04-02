@@ -142,7 +142,50 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
   // Process sensor init response or sensor data as needed.
   String initResponseTopic = "planthub/" + String(PLANT_MODULE_ID) + "/sensor_init_response";
   if (topicStr.equals(initResponseTopic)) {
-    Serial.println("Sensor init response received.");
+    Serial.println("Sensor init response received on topic:");
+    Serial.println(topicStr);
+
+    StaticJsonDocument<1024> doc;
+    DeserializationError error = deserializeJson(doc, payload, length);
+    if (error) {
+      Serial.println("Failed to parse sensor_init_response");
+      return;
+    }
+    
+    Serial.println("Parsed sensor init response JSON:");
+    serializeJsonPretty(doc, Serial);
+    Serial.println();
+    
+    JsonArray sensors = doc["sensors"].as<JsonArray>();
+    JsonArray controls = doc["controls"].as<JsonArray>();
+
+    Serial.print("Number of sensors received: ");
+    Serial.println(sensors.size());
+    Serial.print("Number of controls received: ");
+    Serial.println(controls.size());
+
+    // Map sensors from the JSON response
+    for (JsonObject s : sensors) {
+      String type = s["type"];
+      String id = s["sensor_id"];
+      sensorIdMap[type] = id;
+      Serial.println("Mapped sensor: " + type + " -> " + id);
+    }
+    
+    // Optionally, log control mapping if needed
+    for (JsonObject c : controls) {
+      String type = c["type"];
+      String id = c["control_id"];
+      Serial.println("Received control: " + type + " -> " + id);
+    }
+    
+    // Set registration flag if sensors are mapped
+    if (!sensorIdMap.empty()) {
+      sensorsRegistered = true;
+      Serial.println("Sensor registration completed.");
+    } else {
+      Serial.println("No sensors mapped from sensor init response.");
+    }
     return;
   }
   if (topicStr.indexOf("sensor_data") != -1) {

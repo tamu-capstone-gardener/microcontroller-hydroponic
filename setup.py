@@ -21,6 +21,8 @@ config_template = '''\
 #define PLANT_MODULE_ID "{plant_module_id}"
 
 // Sensor Pins
+#define DHTPIN 13 // Need to make this automatically generated from the setup.py 
+#define DHTTYPE 22
 {sensor_pins}
 
 // Control Pins

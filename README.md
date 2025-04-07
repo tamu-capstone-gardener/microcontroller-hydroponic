@@ -14,7 +14,8 @@ This is the microcontroller code that runs on an ESP32. It communicates via MQTT
 - Before clicking upload, press and hold boot button
 - Click right arrow on VS Code (Upload)
 - Let go of boot button once 'write to memory'
-- Open Serial Monitor on your USB port at 115200 baud rate to read data
+- Open Serial Monitor on your USB port at 115200 baud rate to read data (sometimes the initial part is important in case you haven't filled out your wifi info properly)
+   - On Linux use `screen /dev/ttyUSB* 115200`
 - Once you have made any modifications, tested, and understood the code, simply unplug the USB-C cable from your computer and into an outlet or an 'Always On' part of your outlet relay (if applicable)
 
 ## ESP-32 Pin Selection Guide for PlantHub

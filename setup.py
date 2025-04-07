@@ -11,6 +11,7 @@ config_template = '''\
 
 // WiFi Configuration
 #define WIFI_SSID     "YOUR_SSID"
+#define WIFI_USERNAME "YOUR_USERNAME" // only needed for secure (typically non-personal) networks
 #define WIFI_PASSWORD "YOUR_PASSWORD"
 
 // MQTT Configuration
@@ -21,6 +22,8 @@ config_template = '''\
 #define PLANT_MODULE_ID "{plant_module_id}"
 
 // Sensor Pins
+#define DHTPIN 13 // TODO: Need to make this automatically generated from the setup.py 
+#define DHTTYPE 22
 {sensor_pins}
 
 // Control Pins

@@ -17,8 +17,9 @@ void reconnectMQTT() {
   while (!mqttClient.connected()) {
     String clientId = "ESP32Client-" + String(random(0xffff), HEX);
     if (mqttClient.connect(clientId.c_str())) {
-      mqttClient.subscribe("planthub/+/water");
-      mqttClient.subscribe("planthub/+/sensor_init_response");
+      String subscription = "planthub/" + String(PLANT_MODULE_ID) + "/+";
+      mqttClient.subscribe(subscription.c_str());
+
     } else {
       delay(5000);
     }

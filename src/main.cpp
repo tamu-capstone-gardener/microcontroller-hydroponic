@@ -1,11 +1,13 @@
 #include <Arduino.h>
-#include <time.h>
+#include <ArduinoJson.h>
+#include <vector>
+#include <functional>
+#include <map>
 #include "config.h"
 #include "wifi_manager.h"
 #include "mqtt_manager.h"
 #include "sensor_manager.h"
 #include "relay_controller.h"
-#include <map>
 
 /* TODO 
 
@@ -38,15 +40,107 @@ std::map<String, String> sensorIdMap;
 
 bool sensorsRegistered = false;  // Global flag
 
+// Global state variables for toggling.
+bool pumpIsOn = false;
+bool lightsAreOn = false;
+bool outletIsOn = false;
+
+// Define a type alias for a function that takes no parameters.
+using RelayFunction = std::function<void(void)>;
+
+// Structure to hold a control type's details.
+struct Control {
+  String type;         // e.g., "water", "lights", "outlet"
+  RelayFunction on;    // Function to turn the control on.
+  RelayFunction off;   // Function to turn the control off.
+  bool* state;         // Pointer to a state variable for toggling.
+};
+
+// List of controls.
+std::vector<Control> controlsList;
+
+// Populate the list of controls.
+void setupControlsList() {
+  controlsList.push_back({
+    "pump",
+    []() { 
+      Serial.println("Turning pump ON"); 
+      turnPumpRelayOn(); 
+    },
+    []() { 
+      Serial.println("Turning pump OFF"); 
+      turnPumpRelayOff(); 
+    },
+    &pumpIsOn
+  });
+
+  controlsList.push_back({
+    "outlet",
+    []() { 
+      Serial.println("Turning outlet ON"); 
+      turnOutletRelayOn(); 
+    },
+    []() { 
+      Serial.println("Turning outlet OFF"); 
+      turnOutletRelayOff(); 
+    },
+    &outletIsOn
+  });
+}
+
+// Generic control command handler that loops through controlsList.
+void handleControlCommand(String controlType, StaticJsonDocument<256>& doc) {
+  // Retrieve parameters from JSON.
+  bool toggle = doc["toggle"] | false;
+  int duration = doc["duration"] | 10000;  // Default duration: 10 seconds.
+  
+  Serial.print("Handling command for control type: ");
+  Serial.println(controlType);
+  
+  // Loop through the list to find the matching control.
+  for (auto &ctrl : controlsList) {
+    if (ctrl.type.equals(controlType)) {
+      if (toggle) {
+        // Toggle the control's state.
+        *(ctrl.state) = !(*(ctrl.state));
+        if (*(ctrl.state)) {
+          Serial.print("Toggling ");
+          Serial.print(ctrl.type);
+          Serial.println(": turning ON");
+          ctrl.on();
+        } else {
+          Serial.print("Toggling ");
+          Serial.print(ctrl.type);
+          Serial.println(": turning OFF");
+          ctrl.off();
+        }
+      } else {
+        // Activate the control for a set duration.
+        Serial.print("Activating ");
+        Serial.print(ctrl.type);
+        Serial.print(" for ");
+        Serial.print(duration);
+        Serial.println(" ms");
+        ctrl.on();
+        delay(duration);
+        ctrl.off();
+      }
+      // Found and processed the control; exit the loop.
+      return;
+    }
+  }
+  
+  Serial.print("Control type ");
+  Serial.print(controlType);
+  Serial.println(" not found.");
+}
+
+// MQTT callback function.
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   String topicStr(topic);
+  
+  // Process sensor init response or sensor data as needed.
   String initResponseTopic = "planthub/" + String(PLANT_MODULE_ID) + "/sensor_init_response";
-
-  Serial.print("Full topic received: ");
-  Serial.println(topicStr);
-  Serial.print("Expected suffix: ");
-  Serial.println(initResponseTopic);
-
   if (topicStr.equals(initResponseTopic)) {
     Serial.println("Sensor init response received on topic:");
     Serial.println(topicStr);
@@ -94,18 +188,33 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     }
     return;
   }
-
-  String waterTopic = "planthub/" + String(PLANT_MODULE_ID) + "/water";
-  if (topicStr.equals(waterTopic)) {
-    Serial.println("Water command received.");
-    turnPumpRelayOn();
-    delay(10000);
-    turnPumpRelayOff();
+  if (topicStr.indexOf("sensor_data") != -1) {
+    // Sensor data processing code goes here.
     return;
   }
+  
+  // Otherwise, assume the topic is a control command.
+  // Expected format: planthub/<plant_module_id>/<control_type>
+  int lastSlash = topicStr.lastIndexOf('/');
+  if (lastSlash == -1) {
+    Serial.println("Invalid topic format for control signal");
+    return;
+  }
+  String controlType = topicStr.substring(lastSlash + 1);
+  Serial.print("Received control command for: ");
+  Serial.println(controlType);
+  
+  // Parse the JSON payload.
+  StaticJsonDocument<256> doc;
+  DeserializationError error = deserializeJson(doc, payload, length);
+  if (error) {
+    Serial.println("Failed to parse control command JSON");
+    return;
+  }
+  
+  // Dispatch the command by looping through our list.
+  handleControlCommand(controlType, doc);
 }
-
-
 
 void setup() {
   Serial.begin(115200);
@@ -113,26 +222,24 @@ void setup() {
   initSensors();
   initPumpRelay();
   initOutletRelay();
-  // Set up MQTT with the callback function
+  
+  // Initialize MQTT with our callback.
   setupMQTT(mqttCallback);
   
-  // Wait until both WiFi and MQTT are connected before sending the init message
+  // Initialize our controls list.
+  setupControlsList();
+  
   Serial.println("Waiting for connectivity before sending sensor init message...");
   while (WiFi.status() != WL_CONNECTED || !mqttClient.connected()) {
     Serial.print(".");
     delay(500);
     if (!mqttClient.connected()) {
-      // Attempt to reconnect if MQTT is not connected
       reconnectMQTT();
     }
   }
   Serial.println("\nConnectivity established. Sending sensor init message...");
-  
   delay(3000);
-  // Now that we are connected, send the sensor init message
   sendSensorInitMessage();
-  
-  // Configure time after connections are established
   configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
 }
 

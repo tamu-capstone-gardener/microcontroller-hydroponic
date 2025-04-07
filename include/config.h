@@ -5,6 +5,7 @@
 
 // WiFi Configuration
 #define WIFI_SSID     "placeholder"
+#define WIFI_USERNAME "placeholder"
 #define WIFI_PASSWORD "placeholder"
 
 // MQTT Configuration
@@ -12,14 +13,14 @@
 #define MQTT_PORT     1883
 
 // Plant Module ID
-#define PLANT_MODULE_ID "309f9079-3895-4e74-9454-25b9d5389743"
+#define PLANT_MODULE_ID "8c6b5dcb-6451-4bfd-b9c2-bbf18e4c449a"
 
 // Sensor Pins
+#define DHTPIN 13 // Need to make this automatically generated from the setup.py 
+#define DHTTYPE 22
 #define MOISTURE_PIN 39
 #define TEMPERATURE_PIN 13
 #define HUMIDITY_PIN 12
-#define DHTPIN 13 // Need to make this automatically generated from the setup.py 
-#define DHTTYPE 22
 #define LIGHT_ANALOG_PIN 36
 
 // Control Pins

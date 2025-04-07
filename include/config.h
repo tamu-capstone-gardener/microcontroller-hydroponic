@@ -4,7 +4,7 @@
 #define CONFIG_H
 
 // WiFi Configuration
-#define WIFI_SSID     "placeholer"
+#define WIFI_SSID     "placeholder"
 #define WIFI_USERNAME "placeholder"
 #define WIFI_PASSWORD "placeholder"
 

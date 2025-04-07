@@ -58,7 +58,6 @@ struct Control {
 
 // List of controls.
 std::vector<Control> controlsList;
-std::map<String, unsigned long> scheduledOffTimes;
 
 // Populate the list of controls.
 void setupControlsList() {
@@ -116,15 +115,15 @@ void handleControlCommand(String controlType, StaticJsonDocument<256>& doc) {
           ctrl.off();
         }
       } else {
-        // Activate the control for a set duration without blocking.
+        // Activate the control for a set duration.
         Serial.print("Activating ");
         Serial.print(ctrl.type);
         Serial.print(" for ");
         Serial.print(duration);
         Serial.println(" ms");
         ctrl.on();
-        // Instead of delay(), schedule turning off by recording the off time.
-        scheduledOffTimes[ctrl.type] = millis() + duration;
+        delay(duration);
+        ctrl.off();
       }
       // Found and processed the control; exit the loop.
       return;
@@ -248,26 +247,7 @@ void loop() {
   if (!mqttClient.connected()) reconnectMQTT();
   mqttClient.loop();
 
-  // Process any scheduled control off events.
   unsigned long now = millis();
-  for (auto it = scheduledOffTimes.begin(); it != scheduledOffTimes.end(); ) {
-    if (now >= it->second) {
-      // Find the control in controlsList by matching the type.
-      for (auto &ctrl : controlsList) {
-        if (ctrl.type.equals(it->first)) {
-          Serial.print("Scheduled off: Turning off ");
-          Serial.println(ctrl.type);
-          ctrl.off();
-          *(ctrl.state) = false;
-          break;
-        }
-      }
-      // Remove the event from the map.
-      it = scheduledOffTimes.erase(it);
-    } else {
-      ++it;
-    }
-  }
 
   // Every 12 seconds, take a reading
   if (now - lastReadTime >= READ_INTERVAL_MS) {

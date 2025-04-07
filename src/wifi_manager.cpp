@@ -2,7 +2,9 @@
 #include "esp_wpa2.h" // Include for WPA2 Enterprise
 #include "config.h"   // Your config.h should define WIFI_SSID, WIFI_USERNAME, WIFI_PASSWORD
 
-void connectToWiFi() {
+
+// for TAMU WiFi
+/*void connectToWiFi() {
   WiFi.disconnect(true);  // Reset WiFi
 
   WiFi.mode(WIFI_STA);
@@ -24,4 +26,13 @@ void connectToWiFi() {
 
   Serial.println("\nConnected to WiFi.");
   Serial.println(WiFi.localIP());
+}*/
+
+void connectToWiFi() {
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected. IP: " + WiFi.localIP().toString());
 }

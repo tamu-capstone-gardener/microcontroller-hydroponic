@@ -10,37 +10,39 @@
 #include "relay_controller.h"
 
 /* TODO 
-
 1. Get scheduling of lights and water working
-2. Fix threshold to work with soil
+2. Fix threshold to work with hydroponic sensors
 3. Get camera working
-4. Maybe fix the relay? still have to use voltmeter to short it sometimes 
-5. Control the outlet separately from the pump (when needed)
-
+4. Maybe fix the relay? Still have to use voltmeter to short it sometimes 
+5. Control the outlet separately from the pumps (when needed)
 */
 
+// Global time stamp buffer
 char timeStamp[25];
+
+// Misc. global flags and variables
 bool manualOverride = false;
 unsigned long autoModePauseUntil = 0;
 float temperature, humidity;
 
+// Sensor reading interval and averaging
 const int READ_INTERVAL_MS = 12000;  // 12 seconds between reads (or 5 readings per minute)
 const int NUM_SAMPLES = 5;
-
 unsigned long lastReadTime = 0;
 int readCount = 0;
 
-// Accumulators so that we can average values over a minute for more accurate readings
-int totalMoisture = 0;
+// Accumulators for averaged sensor readings
+// NOTE: The "moisture" variable is now used for the TDS sensor reading.
+int totalMoisture = 0;      
 float totalTemperature = 0;
 float totalHumidity = 0;
 int totalLight = 0;
 
+// Mapping from sensor type to sensor IDs received from the Rails-side
 std::map<String, String> sensorIdMap;
-
 bool sensorsRegistered = false;  // Global flag
 
-// Global state variables for toggling.
+// Global state variables for toggling (still used for non-fertilizer controls)
 bool pumpIsOn = false;
 bool lightsAreOn = false;
 bool outletIsOn = false;
@@ -62,30 +64,93 @@ std::vector<Control> controlsList;
 // Populate the list of controls.
 void setupControlsList() {
   controlsList.push_back({
-    "pump",
+    "pump",  // This legacy control may be used for testing; however, fertilizer control is now handled separately.
     []() { 
       Serial.println("Turning pump ON"); 
-      turnPumpRelayOn(); 
+      // Optionally, you might map this to one of the pump functions.
+      turnPumpNOn(); 
     },
     []() { 
       Serial.println("Turning pump OFF"); 
-      turnPumpRelayOff(); 
+      turnPumpNOff(); 
     },
     &pumpIsOn
   });
 
   controlsList.push_back({
-    "outlet",
+    "outlet",  // In the hydroponic system, the outlet controls the grow light.
     []() { 
-      Serial.println("Turning outlet ON"); 
-      turnOutletRelayOn(); 
+      Serial.println("Turning outlet (light) ON"); 
+      turnLightOn(); 
     },
     []() { 
-      Serial.println("Turning outlet OFF"); 
-      turnOutletRelayOff(); 
+      Serial.println("Turning outlet (light) OFF"); 
+      turnLightOff(); 
     },
     &outletIsOn
   });
+}
+
+// --- NEW: Fertilizer Routine Handler ---
+//
+// This function handles the "fertilizer_routine" MQTT command.
+// It expects a JSON payload with the following format:
+//   {
+//     "mix_1": <mL of Nitrogen>,
+//     "mix_2": <mL of Phosphorus>,
+//     "mix_3": <mL of Potassium>
+//   }
+//
+// The pump on-time is computed by multiplying the requested mL by a calibration factor (ms per mL).
+//
+void handleFertilizerRoutine(StaticJsonDocument<256>& doc) {
+  int mix1 = doc["mix_1"] | 0;  // Nitrogen (mL)
+  int mix2 = doc["mix_2"] | 0;  // Phosphorus (mL)
+  int mix3 = doc["mix_3"] | 0;  // Potassium (mL)
+
+  Serial.println("=== Fertilizer Routine Command ===");
+  Serial.print("Nitrogen (mix_1): ");
+  Serial.println(mix1);
+  Serial.print("Phosphorus (mix_2): ");
+  Serial.println(mix2);
+  Serial.print("Potassium (mix_3): ");
+  Serial.println(mix3);
+
+  // Convert mL to milliseconds using calibration constants defined in config.h:
+  unsigned long timeN = mix1 * MS_PER_ML_N; 
+  unsigned long timeP = mix2 * MS_PER_ML_P;
+  unsigned long timeK = mix3 * MS_PER_ML_K;
+
+  // Sequentially run each pump with a small pause in between.
+  if (mix1 > 0) {
+    Serial.print("Dispensing Nitrogen for ");
+    Serial.print(timeN);
+    Serial.println(" ms");
+    turnPumpNOn();
+    delay(timeN);
+    turnPumpNOff();
+    delay(1000);  // 1 sec pause
+  }
+  if (mix2 > 0) {
+    Serial.print("Dispensing Phosphorus for ");
+    Serial.print(timeP);
+    Serial.println(" ms");
+    turnPumpPOn();
+    delay(timeP);
+    turnPumpPOff();
+    delay(1000);
+  }
+  if (mix3 > 0) {
+    Serial.print("Dispensing Potassium for ");
+    Serial.print(timeK);
+    Serial.println(" ms");
+    turnPumpKOn();
+    delay(timeK);
+    turnPumpKOff();
+    delay(1000);
+  }
+  
+  Serial.println("Fertilizer routine completed.");
 }
 
 // Generic control command handler that loops through controlsList.
@@ -138,8 +203,8 @@ void handleControlCommand(String controlType, StaticJsonDocument<256>& doc) {
 // MQTT callback function.
 void mqttCallback(char* topic, byte* payload, unsigned int length) {
   String topicStr(topic);
-  
-  // Process sensor init response or sensor data as needed.
+
+  // Process sensor init response.
   String initResponseTopic = "planthub/" + String(PLANT_MODULE_ID) + "/sensor_init_response";
   if (topicStr.equals(initResponseTopic)) {
     Serial.println("Sensor init response received on topic:");
@@ -164,7 +229,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     Serial.print("Number of controls received: ");
     Serial.println(controls.size());
 
-    // Map sensors from the JSON response
+    // Map sensors from the JSON response.
     for (JsonObject s : sensors) {
       String type = s["type"];
       String id = s["sensor_id"];
@@ -172,14 +237,14 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       Serial.println("Mapped sensor: " + type + " -> " + id);
     }
     
-    // Optionally, log control mapping if needed
+    // Optionally, log control mapping if needed.
     for (JsonObject c : controls) {
       String type = c["type"];
       String id = c["control_id"];
       Serial.println("Received control: " + type + " -> " + id);
     }
     
-    // Set registration flag if sensors are mapped
+    // Set registration flag if sensors are mapped.
     if (!sensorIdMap.empty()) {
       sensorsRegistered = true;
       Serial.println("Sensor registration completed.");
@@ -188,8 +253,9 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     }
     return;
   }
+
+  // Ignore sensor data messages.
   if (topicStr.indexOf("sensor_data") != -1) {
-    // Sensor data processing code goes here.
     return;
   }
   
@@ -212,7 +278,13 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
     return;
   }
   
-  // Dispatch the command by looping through our list.
+  // If the control command is for a fertilizer routine, handle it separately.
+  if (controlType.equals("fertilizer_routine")) {
+    handleFertilizerRoutine(doc);
+    return;
+  }
+  
+  // Otherwise, dispatch the command by looping through our controls list.
   handleControlCommand(controlType, doc);
 }
 
@@ -220,8 +292,12 @@ void setup() {
   Serial.begin(115200);
   connectToWiFi();
   initSensors();
-  initPumpRelay();
-  initOutletRelay();
+
+  // For the hydroponic setup, initialize the three fertilizer pump relays and the light relay.
+  initPumpN();
+  initPumpP();
+  initPumpK();
+  initLightRelay();
   
   // Initialize MQTT with our callback.
   setupMQTT(mqttCallback);
@@ -249,18 +325,19 @@ void loop() {
 
   unsigned long now = millis();
 
-  // Every 12 seconds, take a reading
+  // Every 12 seconds, take a reading.
   if (now - lastReadTime >= READ_INTERVAL_MS) {
     lastReadTime = now;
 
-    int moisture = readMoisture();
+    // Instead of reading "moisture", we now read the TDS sensor value.
+    // For compatibility, we still call the variable "moisture".
+    int moisture = readTDS();
     float temp = readTemperature();
     float hum = readHumidity();
     int light = readLightAnalog();
 
-    // Uncomment below line for sensor readings printed to serial once every 12 seconds
+    // Print sensor readings (note that "moisture" now represents TDS).
     printSensorReadings(moisture, temp, hum, light);
-
 
     totalMoisture += moisture;
     totalTemperature += temp;
@@ -272,26 +349,26 @@ void loop() {
     Serial.println(readCount);
   }
 
-  // After 5 readings, average and publish
+  // After 5 readings, average and publish.
   if (readCount >= NUM_SAMPLES) {
     int avgMoisture = totalMoisture / NUM_SAMPLES;
     float avgTemp = totalTemperature / NUM_SAMPLES;
     float avgHum = totalHumidity / NUM_SAMPLES;
     int avgLight = totalLight / NUM_SAMPLES;
   
-    // Get time
+    // Get time stamp.
     struct tm timeinfo;
     if (getLocalTime(&timeinfo)) {
       strftime(timeStamp, sizeof(timeStamp), "%Y-%m-%dT%H:%M:%SZ", &timeinfo);
     }
   
     Serial.println("----- Averaged Sensor Readings -----");
-    Serial.print("Moisture: "); Serial.println(avgMoisture);
+    Serial.print("TDS (moisture): "); Serial.println(avgMoisture);
     Serial.print("Temperature: "); Serial.println(avgTemp);
     Serial.print("Humidity: "); Serial.println(avgHum);
     Serial.print("Light (analog): "); Serial.println(avgLight);
   
-    // Only publish sensor data if registration is complete
+    // Only publish sensor data if registration is complete.
     if (!sensorsRegistered) {
       Serial.println("Sensors not registered yet, skipping sensor data publish.");
     } else {
@@ -317,7 +394,7 @@ void loop() {
       }
     }
   
-    // Reset counters for the next averaging cycle
+    // Reset counters for the next averaging cycle.
     readCount = 0;
     totalMoisture = 0;
     totalTemperature = 0;
@@ -325,6 +402,6 @@ void loop() {
     totalLight = 0;
   }  
 
-  // MQTT loop
+  // Continue MQTT loop.
   mqttClient.loop();
 }

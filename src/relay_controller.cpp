@@ -1,34 +1,66 @@
-// relay_controller.cpp
 #include "relay_controller.h"
 #include "config.h"
 #include <Arduino.h>
 
-void initPumpRelay() {
-    pinMode(RELAY_PUMP_PIN, OUTPUT);
-    turnPumpRelayOff();
+// Initialize the pump relays and light relay.
+void initPumpN() {
+    pinMode(RELAY_N_PIN, OUTPUT);
+    digitalWrite(RELAY_N_PIN, LOW);
 }
 
-void initOutletRelay() {
-    pinMode(RELAY_OUTLET_PIN, OUTPUT);
-    turnOutletRelayOff();
+void initPumpP() {
+    pinMode(RELAY_P_PIN, OUTPUT);
+    digitalWrite(RELAY_P_PIN, LOW);
 }
 
-void turnPumpRelayOn() {
-    Serial.println("Turning the pump relay on");
-    digitalWrite(RELAY_PUMP_PIN, HIGH);
+void initPumpK() {
+    pinMode(RELAY_K_PIN, OUTPUT);
+    digitalWrite(RELAY_K_PIN, LOW);
 }
 
-void turnPumpRelayOff() {
-    Serial.println("Turning the pump relay off");
-    digitalWrite(RELAY_PUMP_PIN, LOW); 
+void initLightRelay() {
+    pinMode(RELAY_LIGHT_PIN, OUTPUT);
+    digitalWrite(RELAY_LIGHT_PIN, LOW);
 }
 
-void turnOutletRelayOn() {
-    Serial.println("Turning the outlet relay on");
-    digitalWrite(RELAY_OUTLET_PIN, HIGH);
+// Pump control functions.
+void turnPumpNOn() {
+    Serial.println("Turning Nitrogen pump ON");
+    digitalWrite(RELAY_N_PIN, HIGH);
 }
 
-void turnOutletRelayOff() {
-    Serial.println("Turning the outlet relay off");
-    digitalWrite(RELAY_OUTLET_PIN, LOW);
+void turnPumpNOff() {
+    Serial.println("Turning Nitrogen pump OFF");
+    digitalWrite(RELAY_N_PIN, LOW);
+}
+
+void turnPumpPOn() {
+    Serial.println("Turning Phosphorus pump ON");
+    digitalWrite(RELAY_P_PIN, HIGH);
+}
+
+void turnPumpPOff() {
+    Serial.println("Turning Phosphorus pump OFF");
+    digitalWrite(RELAY_P_PIN, LOW);
+}
+
+void turnPumpKOn() {
+    Serial.println("Turning Potassium pump ON");
+    digitalWrite(RELAY_K_PIN, HIGH);
+}
+
+void turnPumpKOff() {
+    Serial.println("Turning Potassium pump OFF");
+    digitalWrite(RELAY_K_PIN, LOW);
+}
+
+// Light relay control.
+void turnLightOn() {
+    Serial.println("Turning light ON");
+    digitalWrite(RELAY_LIGHT_PIN, HIGH);
+}
+
+void turnLightOff() {
+    Serial.println("Turning light OFF");
+    digitalWrite(RELAY_LIGHT_PIN, LOW);
 }

@@ -1,14 +1,11 @@
 {
-  "plant_module_id": "309f9079-3895-4e74-9454-25b9d5389743",
+  "plant_module_id": "bf6916df-adbb-478d-95dd-707977058ece",
   "sensors": [
     {
-      "type": "moisture"
+      "type": "tds"
     },
     {
-      "type": "temperature"
-    },
-    {
-      "type": "humidity"
+      "type": "float"
     },
     {
       "type": "light_analog"
@@ -16,10 +13,16 @@
   ],
   "controls": [
     {
-      "type": "pump"
+      "type": "n"
     },
     {
-      "type": "outlet"
+      "type": "p"
+    },
+    {
+      "type": "k"
+    },
+    {
+      "type": "light"
     }
   ]
 }

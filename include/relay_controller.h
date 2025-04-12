@@ -16,6 +16,4 @@ void turnPumpKOff();
 
 void turnLightOn();
 void turnLightOff();
-
-// (If you still have your legacy pump functions, you can keep them or remove as needed.)
 #endif

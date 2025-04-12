@@ -37,7 +37,7 @@ float readHumidity() {
   return dht.readHumidity();
 }
 
-void printSensorReadings(/* Add new sensors here */ float tds, bool floatSensor, float temperature, float humidity, int lightAnalog) {
+void printSensorReadings(float tds, bool floatSensor, float temperature, float humidity, int lightAnalog) {
     Serial.println("==== Sensor Readings ====");
     
     Serial.print("TDS (Raw Analog): ");

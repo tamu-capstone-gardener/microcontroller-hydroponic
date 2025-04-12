@@ -67,7 +67,6 @@ void setupControlsList() {
     "pump",  // This legacy control may be used for testing; however, fertilizer control is now handled separately.
     []() { 
       Serial.println("Turning pump ON"); 
-      // Optionally, you might map this to one of the pump functions.
       turnPumpNOn(); 
     },
     []() { 
@@ -237,7 +236,7 @@ void mqttCallback(char* topic, byte* payload, unsigned int length) {
       Serial.println("Mapped sensor: " + type + " -> " + id);
     }
     
-    // Optionally, log control mapping if needed.
+    // Log control mapping.
     for (JsonObject c : controls) {
       String type = c["type"];
       String id = c["control_id"];
